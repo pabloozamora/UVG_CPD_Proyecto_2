@@ -1,3 +1,5 @@
 bruteforce
 bruteforce_mpi
 /gen
+.vscode/
+cipher_text.txt
