@@ -24,8 +24,8 @@ private:
         if (data.empty())  // Verifica si los datos están vacíos
             throw std::runtime_error("Empty data");
 
-        unsigned char lastByte = data.back();  // Obtiene el último byte para determinar la longitud del padding
-        size_t paddingLength = static_cast<size_t>(lastByte);  // Longitud del padding
+        unsigned char lastByte = data.back();  // Obtiene el último byte para determinar la long longitud del padding
+        size_t paddingLength = static_cast<size_t>(lastByte);  // long longitud del padding
 
         // Verifica la validez del padding
         if (paddingLength == 0 || paddingLength > data.size())
@@ -71,7 +71,7 @@ public:
         DES_ncbc_encrypt(
             paddedText.data(),
             ciphertext.data() + 8,  // Comienza después del IV
-            static_cast<long>(paddedText.size()),
+            static_cast<long long>(paddedText.size()),
             &schedule,
             &ivec,
             DES_ENCRYPT
@@ -94,7 +94,7 @@ public:
         DES_ncbc_encrypt(
             ciphertext.data() + 8,
             plaintext.data(),
-            static_cast<long>(ciphertext.size() - 8),
+            static_cast<long long>(ciphertext.size() - 8),
             &schedule,
             &ivec,
             DES_DECRYPT
