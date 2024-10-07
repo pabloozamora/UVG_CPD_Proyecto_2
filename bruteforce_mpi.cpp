@@ -53,8 +53,8 @@
 
         // Cálculo del rango de claves para cada nodo
         long range_per_node = upper / N;
-        mylower = range_per_node * (id - 4)*-1;
-        myupper = range_per_node * ((id - 4)*-1 + 1);
+        mylower = range_per_node * id;
+        myupper = range_per_node * (id + 1);
         std::cout << "Nodo: " << id << ", lower: " << mylower << ", upper: " << myupper << std::endl;
         if (id == N - 1) {
             myupper = upper;  // Compensar el residuo
