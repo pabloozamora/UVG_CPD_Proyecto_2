@@ -5,6 +5,10 @@
 #include <string>
 #include <cstring>
 
+#define LENGTH 8
+#define CORRECT_KEY "12345678"
+#define LIMIT 100000000
+
 using namespace std;
 
 const int PC1[56] = {57, 49, 41, 33, 25, 17, 9,
@@ -365,7 +369,7 @@ int main()
 {
     std::clock_t start;
     double duration;
-    string correctKey = "123456";
+    string correctKey = CORRECT_KEY;
     bitset<64> key = convertKeyToBitset(correctKey);
 
     vector<bitset<48>> keys = generateKeys(key);
@@ -390,10 +394,10 @@ int main()
 
     start = std::clock();
 
-    for (long long i = 0; i < 1000000; ++i)
+    for (long long i = 0; i < LIMIT; ++i)
     {
         string currentKeyString = std::to_string(i);
-        while (currentKeyString.size() < 6)
+        while (currentKeyString.size() < LENGTH)
         {
             currentKeyString = "0" + currentKeyString;
         }
