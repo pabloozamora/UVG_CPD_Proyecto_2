@@ -5,9 +5,8 @@
 #include <openssl/des.h>
 #include <openssl/sha.h>
 
-#define LENGTH 8
-#define CORRECT_KEY "12345678"
-#define LIMIT 100000000
+#define LENGTH 3
+#define CORRECT_KEY "9Ea"
 
 // Genera una clave DES válida a partir de una clave de cualquier tamaño
 std::string generateDesKey(const std::string& key) {
@@ -71,7 +70,24 @@ bool tryKey(const std::string& key, const std::string& ciphertext, const std::st
     return found;
 }
 
+// Función para generar todas las combinaciones posibles de caracteres ASCII
+bool generateKeys(int pos, std::string& currentKey, const std::string& ciphertext, const std::string& searchPhrase) {
+    if (pos == LENGTH) {
+        return tryKey(currentKey, ciphertext, searchPhrase); // Salir si se encuentra la clave
+    }
+
+    for (int i = 0; i < 256; ++i) {
+        currentKey[pos] = static_cast<char>(i); // Asignar el carácter ASCII
+        if (generateKeys(pos + 1, currentKey, ciphertext, searchPhrase)) { // Llamada recursiva
+            return true; // Si se encontró la clave, retorna verdadero
+        }
+    }
+    return false; // Retornar falso si no se encontró la clave
+}
+
 int main() {
+    std::clock_t start;
+    double duration;
     std::string plaintext = "Esta es una prueba de proyecto 2";
     std::string searchPhrase = "es una prueba de";
 
@@ -80,27 +96,18 @@ int main() {
 
     std::cout << "Texto encriptado: " << ciphertext << std::endl;
 
-    std::clock_t start;
-    double duration;
+    std::string currentKey(LENGTH, '\0'); // Inicializa la clave actual con el tamaño necesario
 
     start = std::clock();
+    bool found = generateKeys(0, currentKey, ciphertext, searchPhrase); // Generar combinaciones de llaves
+    duration = (std::clock() - start) / (double)CLOCKS_PER_SEC;
 
-    for (long long i = 0; i < LIMIT; ++i) {
-        std::string currentKey = std::to_string(i);
-
-        while (currentKey.size() < LENGTH) {
-            currentKey = "0" + currentKey;
-        }
-
-        if (tryKey(currentKey, ciphertext, searchPhrase)) {
-            std::cout << "Clave encontrada: " << currentKey << std::endl;
-            duration = (std::clock() - start) / (double)CLOCKS_PER_SEC;
-            std::cout << "Tiempo de ejecución: " << duration << " segundos" << std::endl;
-            return 0;
-        }
+    if (found) {
+        std::cout << "Clave encontrada: " << currentKey << std::endl;
+        std::cout << "Tiempo de ejecución: " << duration << " segundos" << std::endl;
+    } else {
+        std::cout << "Error: No se ha podido encontrar la clave." << std::endl;
     }
-
-    std::cout << "Error: No se ha podido encontrar la clave." << std::endl;
 
     return 0;
 }
