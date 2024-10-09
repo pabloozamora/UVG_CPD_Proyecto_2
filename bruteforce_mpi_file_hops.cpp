@@ -34,32 +34,34 @@ std::vector<unsigned char> convertToUChar(const std::vector<int>& intVec) {
     return ucharVec;
 }
 
-// Función para leer el archivo y convertir a vector de unsigned char
-std::vector<unsigned char> readCipherFromFile(const std::string& filename) {
+// Función para leer el archivo de texto plano
+std::string readPlainTextFromFile(const std::string& filename) {
     std::ifstream file(filename);
-    std::vector<int> cypherAscii;
-    std::string line;
-    int value;
+    std::string plainText;
 
     if (file.is_open()) {
-        // Lee todo el contenido del archivo
-        while (std::getline(file, line)) {
-            std::stringstream ss(line);
-            while (ss >> value) {
-                cypherAscii.push_back(value);
-                if (ss.peek() == ',') {
-                    ss.ignore();  // Ignorar la coma
-                }
-            }
-        }
+        std::getline(file, plainText, '\0');  // Leer todo el archivo en una sola línea
         file.close();
     } else {
         std::cerr << "Error al abrir el archivo: " << filename << std::endl;
-        MPI_Abort(MPI_COMM_WORLD, 1);  // Aborta la ejecución si no se puede leer el archivo
+        MPI_Abort(MPI_COMM_WORLD, 1);
     }
 
-    std::vector<unsigned char> cypherText = convertToUChar(cypherAscii);
-    return cypherText;
+    return plainText;
+}
+
+// Convierte una cadena de valores ASCII a una clave
+std::string asciiToString(const std::string& asciiValues) {
+    std::stringstream ss(asciiValues);
+    std::string item;
+    std::string result;
+
+    while (std::getline(ss, item, ',')) {
+        char c = static_cast<char>(std::stoi(item));
+        result += c;
+    }
+
+    return result;
 }
 
 
@@ -67,13 +69,14 @@ int main(int argc, char* argv[]) {
 
     auto start = std::chrono::high_resolution_clock::now();
 
-    if (argc < 3) {
-        std::cerr << "Uso: " << argv[0] << " <archivo_cifrado> <patron_busqueda>" << std::endl;
+    if (argc < 4) {
+        std::cerr << "Uso: " << argv[0] << " <archivo_texto_plano> <llave_ascii_comas> <patron_busqueda>" << std::endl;
         return 1;
     }
 
-    std::string filename = argv[1];    // Primer argumento: nombre del archivo cifrado
-    std::string search = argv[2];      // Segundo argumento: patrón de búsqueda
+    std::string plainTextFile = argv[1];  // Primer argumento: nombre del archivo de texto original
+    std::string asciiKey = argv[2];       // Segundo argumento: clave ASCII separada por comas
+    std::string search = argv[3];         // Tercer argumento: patrón de búsqueda
 
     int N, id;
     long long upper = (1L << 56);  // Límite superior para claves DES (2^56)
@@ -89,6 +92,24 @@ int main(int argc, char* argv[]) {
     MPI_Comm_size(MPI_COMM_WORLD, &N);
     MPI_Comm_rank(MPI_COMM_WORLD, &id);
 
+    // Cifrar el mensaje
+    std::string plainText = readPlainTextFromFile(plainTextFile);
+    std::string key = asciiToString(asciiKey);
+
+    DESCrypt desCrypt(key);
+    std::vector<unsigned char> cipherText = desCrypt.encrypt(plainText);
+
+    // Mostrar la clave y el texto cifrado solo en el proceso 0
+    if (id == 0) {
+        std::cout << "Llave (ASCII): " << asciiKey << " <" << key << ">" << std::endl;
+        std::cout << "Texto original: " << plainText << std::endl;
+        std::cout << "Texto cifrado (enteros): ";
+        for (unsigned char c : cipherText) {
+            std::cout << static_cast<int>(c) << ", ";
+        }
+        std::cout << std::endl;
+    }
+
     // Cálculo del rango de claves para cada nodo
     long long range_per_node = upper / N;
     mylower = range_per_node * id;
@@ -97,8 +118,6 @@ int main(int argc, char* argv[]) {
     if (id == N - 1) {
         myupper = upper;  // Compensar el residuo
     }
-
-    std::vector<unsigned char> cypherText = readCipherFromFile(filename);
 
     long long found = -1;  // -1: no se ha encontrado
     MPI_Irecv(&found, 1, MPI_LONG_LONG, MPI_ANY_SOURCE, keyFindedTag, MPI_COMM_WORLD, &req);
@@ -123,7 +142,7 @@ int main(int argc, char* argv[]) {
             keyStr[j] = (i >> (j * 8)) & 0xFF;  // Extrae cada byte de la clave
         }
 
-        if (tryKey(keyStr, cypherText, search)) {
+        if (tryKey(keyStr, cipherText, search)) {
             found = i;
             std::cout << "Key encontrada en rank " << id << " i=" << found << std::endl;
             // Notifica a todos los nodos que se encontró la clave
@@ -143,11 +162,10 @@ int main(int argc, char* argv[]) {
         }
     }
 
+     MPI_Barrier(MPI_COMM_WORLD);
+
     // El nodo principal descifra el texto cifrado con la clave encontrada
     if (id == 0) {
-        for (int node = 0; node < N - 1; node++) {
-            MPI_Recv(NULL, 0, MPI_LONG_LONG,MPI_ANY_SOURCE, rankFinishedTag, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-        }
 
         if(found != -1){
             std::string keyStr(8, '\0');
@@ -158,7 +176,7 @@ int main(int argc, char* argv[]) {
             // Descifra el texto encontrado y muestra el resultado
             std::cout << "Llave: " << keyStr << std::endl;
             DESCrypt desCrypt(keyStr);
-            std::string decryptedText = desCrypt.decrypt(cypherText);
+            std::string decryptedText = desCrypt.decrypt(cipherText);
             std::cout <<"Texto desencriptado: " << decryptedText << std::endl;
         }
 
@@ -167,10 +185,6 @@ int main(int argc, char* argv[]) {
         std::chrono::duration<double> duration = end - start;
         std::cout << "Tiempo de ejecución: " << duration.count() << " segundos" << std::endl;
 
-    } else {
-        // Enviar mensaje a 0 de que rank finalizó
-        int node = 0;
-        MPI_Send(NULL, 0,  MPI_LONG_LONG, node, rankFinishedTag, MPI_COMM_WORLD);
     }
 
     std::cout << "El rank " << id << " ha finalizado." << std::endl;
