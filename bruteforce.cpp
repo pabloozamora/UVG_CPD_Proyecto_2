@@ -5,10 +5,9 @@
 #include <openssl/des.h>
 #include <openssl/sha.h>
 
-#define LENGTH 3
-#define CORRECT_KEY "9Ea"
+#define LENGTH 5
+#define CORRECT_KEY "9Easz"
 
-// Genera una clave DES válida a partir de una clave de cualquier tamaño
 std::string generateDesKey(const std::string& key) {
     unsigned char hash[SHA256_DIGEST_LENGTH];
     SHA256(reinterpret_cast<const unsigned char*>(key.c_str()), key.length(), hash);
@@ -70,19 +69,18 @@ bool tryKey(const std::string& key, const std::string& ciphertext, const std::st
     return found;
 }
 
-// Función para generar todas las combinaciones posibles de caracteres ASCII
 bool generateKeys(int pos, std::string& currentKey, const std::string& ciphertext, const std::string& searchPhrase) {
     if (pos == LENGTH) {
-        return tryKey(currentKey, ciphertext, searchPhrase); // Salir si se encuentra la clave
+        return tryKey(currentKey, ciphertext, searchPhrase);
     }
 
     for (int i = 0; i < 256; ++i) {
-        currentKey[pos] = static_cast<char>(i); // Asignar el carácter ASCII
-        if (generateKeys(pos + 1, currentKey, ciphertext, searchPhrase)) { // Llamada recursiva
-            return true; // Si se encontró la clave, retorna verdadero
+        currentKey[pos] = static_cast<char>(i);
+        if (generateKeys(pos + 1, currentKey, ciphertext, searchPhrase)) {
+            return true;
         }
     }
-    return false; // Retornar falso si no se encontró la clave
+    return false;
 }
 
 int main() {
@@ -96,10 +94,10 @@ int main() {
 
     std::cout << "Texto encriptado: " << ciphertext << std::endl;
 
-    std::string currentKey(LENGTH, '\0'); // Inicializa la clave actual con el tamaño necesario
+    std::string currentKey(LENGTH, '\0');
 
     start = std::clock();
-    bool found = generateKeys(0, currentKey, ciphertext, searchPhrase); // Generar combinaciones de llaves
+    bool found = generateKeys(0, currentKey, ciphertext, searchPhrase);
     duration = (std::clock() - start) / (double)CLOCKS_PER_SEC;
 
     if (found) {
