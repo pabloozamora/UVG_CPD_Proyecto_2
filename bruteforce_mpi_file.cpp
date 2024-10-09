@@ -76,7 +76,7 @@ int main(int argc, char* argv[]) {
     std::string search = argv[3];         // Tercer argumento: patrón de búsqueda
 
     int N, id;
-    long upper = (1L << 10);  // Límite superior para claves DES (2^56)
+    long upper = (1L << 56);  // Límite superior para claves DES (2^56)
     long mylower, myupper;
 
     // Tags de mensajes
@@ -120,7 +120,7 @@ int main(int argc, char* argv[]) {
 
     // Búsqueda de la clave mediante fuerza bruta
     for (long i = mylower; i < myupper && found == -1; ++i) {
-        if (i % 50000000 == 0) {
+        if (i % 10000000 == 0) {
             auto end = std::chrono::high_resolution_clock::now();
             std::chrono::duration<double> time = end - start;
             std::cout << "Rank " << id << ", iteración " << i << ", tiempo transcurrido: " << time.count() << " seg" << std::endl;
@@ -145,8 +145,6 @@ int main(int argc, char* argv[]) {
         MPI_Test(&req, &messageReceived, MPI_STATUS_IGNORE);
 
         if (messageReceived) {
-            MPI_Wait(&req, MPI_STATUS_IGNORE);
-
             std::cout << "Key encontrada en otro nodo, saliendo del bucle " << id << std::endl;
             break;
         }
@@ -161,7 +159,8 @@ int main(int argc, char* argv[]) {
             for (int j = 0; j < 8; ++j) {
                 keyStr[j] = (found >> (j * 8)) & 0xFF;
             }
-
+            
+            std::cout << "Llave: " << keyStr << std::endl;
             DESCrypt desCrypt(keyStr);
             std::string decryptedText = desCrypt.decrypt(cipherText);
             std::cout << "Texto desencriptado: " << decryptedText << std::endl;
