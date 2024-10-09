@@ -61,11 +61,6 @@ std::vector<unsigned char> readCipherFromFile(const std::string& filename) {
     return cypherText;
 }
 
-
-#include <omp.h>
-
-// ...
-
 int main(int argc, char* argv[]) {
     if (argc < 3) {
         std::cerr << "Uso: " << argv[0] << " <archivo_cifrado> <patron_busqueda>" << std::endl;
@@ -105,8 +100,19 @@ int main(int argc, char* argv[]) {
 
     // Búsqueda de la clave mediante fuerza bruta usando OpenMP
     #pragma omp parallel for shared(found)
-    for (long i = mylower; i < myupper && found == -1; ++i) {
-        if (i % 10000000 == 0) {
+    for (long i = mylower; i < myupper; ++i) {
+
+        // Punto de cancelación para asegurarse de que todos los hilos se detengan
+        #pragma omp cancellation point for
+
+        // Verificar si se ha encontrado la llave
+        #pragma omp flush(found)
+        if (found != -1) {
+            #pragma omp cancel for
+            continue;  // Salir del bucle si se encontró la llave
+        }
+
+        if (i % 1000000 == 0) {
             #pragma omp critical
             std::cout << "Rank " << id << ", iteración " << i << std::endl;
         }
@@ -128,16 +134,18 @@ int main(int argc, char* argv[]) {
                     }
                 }
             }
-            break;
+            #pragma omp flush(found)
         }
 
-        // Si se ha recibido un mensaje, salir del bucle
-        int messageReceived;
-        MPI_Test(&req, &messageReceived, MPI_STATUS_IGNORE);
-
-        if (messageReceived) { 
-            std::cout << "Key encontrada en otro nodo, saliendo del bucle " << id << std::endl;
-            break;
+        if (found == -1) {
+            // Verificar si otro nodo ha encontrado la clave
+            int messageReceived;
+            MPI_Test(&req, &messageReceived, MPI_STATUS_IGNORE);
+            if (messageReceived) {
+                #pragma omp critical
+                std::cout << "Key encontrada en otro nodo, saliendo del bucle " << id << std::endl;
+                #pragma omp flush(found)
+            }
         }
     }
 
@@ -172,4 +180,3 @@ int main(int argc, char* argv[]) {
     MPI_Finalize();
     return 0;
 }
-
