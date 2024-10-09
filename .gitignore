@@ -1,6 +1,10 @@
 bruteforce
 bruteforce_mpi
+bruteforce_mpi_file
+bruteforce_mpi_file_hops
+bruteforce_mpi_file_parallel
 introduction
 /gen
 .vscode/
 cipher_text.txt
+input.txt

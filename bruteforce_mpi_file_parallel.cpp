@@ -70,6 +70,9 @@ int main(int argc, char* argv[]) {
     std::string filename = argv[1];    // Primer argumento: nombre del archivo cifrado
     std::string search = argv[2];      // Segundo argumento: patrón de búsqueda
 
+    int num_threads = 4; // Número de hilos por proceso
+    omp_set_num_threads(num_threads);
+
     int N, id;
     long upper = (1L << 56);  // Límite superior para claves DES (2^56)
     long mylower, myupper;
@@ -99,54 +102,61 @@ int main(int argc, char* argv[]) {
     MPI_Irecv(&found, 1, MPI_LONG, MPI_ANY_SOURCE, keyFindedTag, MPI_COMM_WORLD, &req);
 
     // Búsqueda de la clave mediante fuerza bruta usando OpenMP
-    #pragma omp parallel for shared(found)
-    for (long i = mylower; i < myupper; ++i) {
+    #pragma omp parallel shared(found)
+    {
+        int thread_id = omp_get_thread_num();
+        int num_threads = omp_get_num_threads();
 
-        // Punto de cancelación para asegurarse de que todos los hilos se detengan
-        #pragma omp cancellation point for
+        // Cálculo del rango de iteraciones para cada hilo
+        long range_per_thread = (myupper - mylower) / num_threads;
+        long thread_lower = mylower + range_per_thread * thread_id;
+        long thread_upper = (thread_id == num_threads - 1) ? myupper : (thread_lower + range_per_thread);
 
-        // Verificar si se ha encontrado la llave
-        #pragma omp flush(found)
-        if (found != -1) {
-            #pragma omp cancel for
-            continue;  // Salir del bucle si se encontró la llave
-        }
+        for (long i = thread_lower; i < thread_upper; ++i) {
 
-        if (i % 1000000 == 0) {
-            #pragma omp critical
-            std::cout << "Rank " << id << ", iteración " << i << std::endl;
-        }
+            // Verificar si se ha encontrado la llave
+            #pragma omp flush(found)
+            if (found != -1) {
+                break;  // Salir del bucle si se encontró la llave
+            }
 
-        std::string keyStr(8, '\0');
-        for (int j = 0; j < 8; ++j) {
-            keyStr[j] = (i >> (j * 8)) & 0xFF;  // Extrae cada byte de la clave
-        }
+            if (i % 1000000 == 0) {
+                #pragma omp critical
+                std::cout << "Rank " << id << ", iteración " << i << std::endl;
+            }
 
-        if (tryKey(keyStr, cypherText, search)) {
-            #pragma omp critical
-            {
-                if (found == -1) {
-                    found = i;
-                    std::cout << "Key encontrada en rank " << id << " i=" << found << std::endl;
-                    // Notifica a todos los nodos que se encontró la clave
-                    for (int node = 0; node < N; node++) {
-                        MPI_Isend(&found, 1, MPI_LONG, node, keyFindedTag, MPI_COMM_WORLD, &req);
+            std::string keyStr(8, '\0');
+            for (int j = 0; j < 8; ++j) {
+                keyStr[j] = (i >> (j * 8)) & 0xFF;  // Extrae cada byte de la clave
+            }
+
+            if (tryKey(keyStr, cypherText, search)) {
+                #pragma omp critical
+                {
+                    if (found == -1) {
+                        found = i;
+                        std::cout << "Key encontrada en rank " << id << " i=" << found << std::endl;
+                        // Notifica a todos los nodos que se encontró la clave
+                        for (int node = 0; node < N; node++) {
+                            MPI_Isend(&found, 1, MPI_LONG, node, keyFindedTag, MPI_COMM_WORLD, &req);
+                        }
                     }
                 }
-            }
-            #pragma omp flush(found)
-        }
-
-        if (found == -1) {
-            // Verificar si otro nodo ha encontrado la clave
-            int messageReceived;
-            MPI_Test(&req, &messageReceived, MPI_STATUS_IGNORE);
-            if (messageReceived) {
-                #pragma omp critical
-                std::cout << "Key encontrada en otro nodo, saliendo del bucle " << id << std::endl;
                 #pragma omp flush(found)
             }
+
+            if (found == -1) {
+                // Verificar si otro nodo ha encontrado la clave
+                int messageReceived;
+                MPI_Test(&req, &messageReceived, MPI_STATUS_IGNORE);
+                if (messageReceived) {
+                    #pragma omp critical
+                    std::cout << "Key encontrada en otro nodo, saliendo del bucle " << id << std::endl;
+                    #pragma omp flush(found)
+                }
+            }
         }
+
     }
 
     // El nodo principal descifra el texto cifrado con la clave encontrada
