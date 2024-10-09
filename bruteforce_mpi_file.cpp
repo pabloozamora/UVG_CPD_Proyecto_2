@@ -5,6 +5,7 @@
 #include <mpi.h>
 #include "DESCrypt.h"
 #include <sstream>
+#include <chrono>
 
 // Función que intenta descifrar el texto cifrado con una clave dada
 int tryKey(const std::string keyStr, std::vector<unsigned char> cipher, const std::string& search) {
@@ -62,6 +63,9 @@ std::vector<unsigned char> readCipherFromFile(const std::string& filename) {
 
 
 int main(int argc, char* argv[]) {
+
+    auto start = std::chrono::high_resolution_clock::now();
+
     if (argc < 3) {
         std::cerr << "Uso: " << argv[0] << " <archivo_cifrado> <patron_busqueda>" << std::endl;
         return 1;
@@ -101,8 +105,10 @@ int main(int argc, char* argv[]) {
     // Búsqueda de la clave mediante fuerza bruta
     for (long i = mylower; i < myupper && found == -1; ++i) {
 
-        if (i % 10000000 == 0){
-            std::cout << "Rank " << id << ", iteración " << i << std::endl;
+        if (i % 50000000 == 0){
+            auto end = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<double> time = end - start;
+            std::cout << "Rank " << id << ", iteración " << i << ", tiempo transcurrido: " << time.count() << " seg" <<  std::endl;
         }
 
         std::string keyStr(8, '\0');
@@ -143,11 +149,16 @@ int main(int argc, char* argv[]) {
             }
 
             // Descifra el texto encontrado y muestra el resultado
-            std::cout << "Llave: " << keyStr << std::endl;
+            std::cout << "Llave No. " << found << ": " << keyStr << std::endl;
             DESCrypt desCrypt(keyStr);
             std::string decryptedText = desCrypt.decrypt(cypherText);
             std::cout <<"Texto desencriptado: " << decryptedText << std::endl;
         }
+
+        // Calcular el tiempo
+        auto end = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> duration = end - start;
+        std::cout << "Tiempo de ejecución: " << duration.count() << " segundos" << std::endl;
 
     } else {
         // Enviar mensaje a 0 de que rank finalizó

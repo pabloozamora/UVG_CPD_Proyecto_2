@@ -6,6 +6,7 @@
 #include "DESCrypt.h"
 #include <sstream>
 #include "numberGenerator.h"
+#include <chrono>
 
 // Función que intenta descifrar el texto cifrado con una clave dada
 int tryKey(const std::string keyStr, std::vector<unsigned char> cipher, const std::string& search) {
@@ -63,6 +64,9 @@ std::vector<unsigned char> readCipherFromFile(const std::string& filename) {
 
 
 int main(int argc, char* argv[]) {
+
+    auto start = std::chrono::high_resolution_clock::now();
+
     if (argc < 3) {
         std::cerr << "Uso: " << argv[0] << " <archivo_cifrado> <patron_busqueda>" << std::endl;
         return 1;
@@ -100,15 +104,17 @@ int main(int argc, char* argv[]) {
     MPI_Irecv(&found, 1, MPI_LONG_LONG, MPI_ANY_SOURCE, keyFindedTag, MPI_COMM_WORLD, &req);
 
     // Búsqueda de la clave mediante fuerza bruta
-    long long subBlockSize = 1000000;
-    NumberGenerator generator(mylower, myupper, 5);
+    long long subBlockSize = 10000000;
+    NumberGenerator generator(mylower, myupper, subBlockSize);
 
     long long i;
     long long cont = 0;
     while ((i = generator.getNextNumber()) != -1) {
 
-        if (cont % 1000000 == 0){
-            std::cout << "Rank " << id << ", iteración " << cont << ", i=" << i << std::endl;
+        if (cont % 10000000 == 0){
+            auto end = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<double> time = end - start;
+            std::cout << "Rank " << id << ", iteración " << cont << ", i=" << i << ", tiempo transcurrido: " << time.count() << " seg" << std::endl;
         }
         cont++;
 
@@ -155,6 +161,11 @@ int main(int argc, char* argv[]) {
             std::string decryptedText = desCrypt.decrypt(cypherText);
             std::cout <<"Texto desencriptado: " << decryptedText << std::endl;
         }
+
+        // Calcular el tiempo
+        auto end = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> duration = end - start;
+        std::cout << "Tiempo de ejecución: " << duration.count() << " segundos" << std::endl;
 
     } else {
         // Enviar mensaje a 0 de que rank finalizó
