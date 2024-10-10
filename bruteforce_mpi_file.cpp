@@ -114,6 +114,8 @@ int main(int argc, char* argv[]) {
     if (id == N - 1) {
         myupper = upper;  // Compensar el residuo
     }
+    std::cout << "Nodo: " << id << ", lower: " << mylower << ", upper: " << myupper << std::endl;
+
 
     long found = -1;  // -1: no se ha encontrado
     MPI_Irecv(&found, 1, MPI_LONG, MPI_ANY_SOURCE, keyFindedTag, MPI_COMM_WORLD, &req);
